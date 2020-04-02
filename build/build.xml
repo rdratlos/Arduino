@@ -1097,25 +1097,25 @@
       <param name="file" value="windows/work/lib/jnidispatch-4.2.2-win32-x86.dll" />
     </antcall>
 
-    <unzip src="../arduino-core/lib/jssc-2.8.0-arduino4.jar" dest="windows/work/lib">
+    <unzip src="../arduino-core/lib/jSerialComm-2.6.0.jar" dest="windows/work/lib">
       <patternset>
-        <include name="libs/windows/jSSC-2.8_x86.dll"/>
+        <include name="libs/windows/jSerialComm-2.6.0_x86.dll"/>
       </patternset>
       <mapper type="flatten"/>
     </unzip>
-    <move file="windows/work/lib/jSSC-2.8_x86.dll" tofile="windows/work/lib/jSSC-2.8_x86.dll" />
+    <move file="windows/work/lib/jSerialComm-2.6.0_x86.dll" tofile="windows/work/lib/jSerialComm-2.6.0_x86.dll" />
     <antcall target="make-file-executable">
-      <param name="file" value="windows/work/lib/jSSC-2.8_x86.dll" />
+      <param name="file" value="windows/work/lib/jSerialComm-2.6.0_x86.dll" />
     </antcall>
-    <unzip src="../arduino-core/lib/jssc-2.8.0-arduino4.jar" dest="windows/work/lib">
+    <unzip src="../arduino-core/lib/jSerialComm-2.6.0.jar" dest="windows/work/lib">
       <patternset>
-        <include name="libs/windows/jSSC-2.8_x86_64.dll"/>
+        <include name="libs/windows/jSerialComm-2.6.0_x86_64.dll"/>
       </patternset>
       <mapper type="flatten"/>
     </unzip>
-    <move file="windows/work/lib/jSSC-2.8_x86_64.dll" tofile="windows/work/lib/jSSC-2.8_x86_64.dll" />
+    <move file="windows/work/lib/jSerialComm-2.6.0_x86_64.dll" tofile="windows/work/lib/jSerialComm-2.6.0_x86_64.dll" />
     <antcall target="make-file-executable">
-      <param name="file" value="windows/work/lib/jSSC-2.8_x86_64.dll" />
+      <param name="file" value="windows/work/lib/jSerialComm-2.6.0_x86_64.dll" />
     </antcall>
 
     <antcall target="assemble">

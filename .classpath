@@ -18,7 +18,7 @@
 	<classpathentry kind="lib" path="app/lib/jmdns-3.5.3.jar"/>
 	<classpathentry kind="lib" path="app/lib/slf4j-api-1.7.22.jar"/>
 	<classpathentry kind="lib" path="app/lib/jsch-0.1.50.jar"/>
-	<classpathentry kind="lib" path="app/lib/jssc-2.8.0-arduino3.jar"/>
+	<classpathentry kind="lib" path="app/lib/jSerialComm-2.6.0.jar"/>
 	<classpathentry kind="lib" path="app/lib/bcpg-jdk15on-152.jar"/>
 	<classpathentry kind="lib" path="app/lib/bcprov-jdk15on-152.jar"/>
 	<classpathentry kind="lib" path="app/lib/jackson-core-2.9.5.jar"/>
