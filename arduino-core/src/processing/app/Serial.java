@@ -22,10 +22,10 @@
 
 package processing.app;
 
-import jssc.SerialPort;
-import jssc.SerialPortEvent;
-import jssc.SerialPortEventListener;
-import jssc.SerialPortException;
+import com.fazecast.jSerialComm.SerialPort;
+import com.fazecast.jSerialComm.SerialPortDataListener;
+import com.fazecast.jSerialComm.SerialPortEvent;
+import com.fazecast.jSerialComm.SerialPortInvalidPortException​;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -34,13 +34,12 @@ import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.List;
 
 import static processing.app.I18n.format;
 import static processing.app.I18n.tr;
 
-public class Serial implements SerialPortEventListener {
+public class Serial implements SerialPortDataListener {
 
   //PApplet parent;
 
@@ -96,22 +95,22 @@ public class Serial implements SerialPortEventListener {
   }
 
   public static boolean touchForCDCReset(String iname) throws SerialException {
-    SerialPort serialPort = new SerialPort(iname);
+    SerialPort serialPort = null;
     try {
-      serialPort.openPort();
-      serialPort.setParams(1200, 8, SerialPort.STOPBITS_1, SerialPort.PARITY_NONE);
-      serialPort.setDTR(false);
-      serialPort.closePort();
-      return true;
-    } catch (SerialPortException e) {
+      serialPort = SerialPort.getCommPort(iname);
+      if (serialPort.openPort()) {
+          serialPort.setComPortParameters(1200, 8, SerialPort.ONE_STOP_BIT, SerialPort.NO_PARITY);
+          serialPort.clearDTR​();
+          serialPort.closePort();
+          return true;
+      } else {
+          throw new SerialException(format(tr("Error touching serial port ''{0}''."), iname));
+      }
+    } catch (SerialPortInvalidPortException​ e) {
       throw new SerialException(format(tr("Error touching serial port ''{0}''."), iname), e);
     } finally {
-      if (serialPort.isOpened()) {
-        try {
-          serialPort.closePort();
-        } catch (SerialPortException e) {
-          // noop
-        }
+      if (serialPort != null) {
+        serialPort.closePort();
       }
     }
   }
@@ -123,37 +122,46 @@ public class Serial implements SerialPortEventListener {
 
     resetDecoding(StandardCharsets.UTF_8);
 
-    int parity = SerialPort.PARITY_NONE;
-    if (iparity == 'E') parity = SerialPort.PARITY_EVEN;
-    if (iparity == 'O') parity = SerialPort.PARITY_ODD;
+    int parity = SerialPort.NO_PARITY;
+    if (iparity == 'E') parity = SerialPort.EVEN_PARITY;
+    if (iparity == 'O') parity = SerialPort.ODD_PARITY;
 
-    int stopbits = SerialPort.STOPBITS_1;
-    if (istopbits == 1.5f) stopbits = SerialPort.STOPBITS_1_5;
-    if (istopbits == 2) stopbits = SerialPort.STOPBITS_2;
+    int stopbits = SerialPort.ONE_STOP_BIT;
+    if (istopbits == 1.5f) stopbits = SerialPort.ONE_POINT_FIVE_STOP_BITS;
+    if (istopbits == 2) stopbits = SerialPort.TWO_STOP_BITS;
 
+    int flowControl;
+    if (setRTS) {
+        flowControl = SerialPort.FLOW_CONTROL_RTS_ENABLED | SerialPort.FLOW_CONTROL_CTS_ENABLED;
+    } else if (setDTR) {
+        flowControl = SerialPort.FLOW_CONTROL_DTR_ENABLED | SerialPort.FLOW_CONTROL_DSR_ENABLED;
+    } else {
+        flowControl = SerialPort.FLOW_CONTROL_DISABLED;
+    }
+ 
     // This is required for unit-testing
     if (iname.equals("none")) {
       return;
     }
 
     try {
-      port = new SerialPort(iname);
-      port.openPort();
-      boolean res = port.setParams(irate, idatabits, stopbits, parity, setRTS, setDTR);
-      if (!res) {
-        System.err.println(format(tr("Error while setting serial port parameters: {0} {1} {2} {3}"),
-                                  irate, iparity, idatabits, istopbits));
-      }
-      port.addEventListener(this);
-    } catch (SerialPortException e) {
-      if (e.getPortName().startsWith("/dev") && SerialPortException.TYPE_PERMISSION_DENIED.equals(e.getExceptionType())) {
+      port = SerialPort.getCommPort(iname);
+    } catch (SerialPortInvalidPortException​ e) {
+      if (iname.startsWith("/dev")) {
         throw new SerialException(format(tr("Error opening serial port ''{0}''. Try consulting the documentation at http://playground.arduino.cc/Linux/All#Permission"), iname));
+      } else {
+        throw new SerialException(format(tr("Error opening serial port ''{0}''."), iname), e);
       }
-      throw new SerialException(format(tr("Error opening serial port ''{0}''."), iname), e);
     }
 
     if (port == null) {
       throw new SerialNotFoundException(format(tr("Serial port ''{0}'' not found. Did you select the right one from the Tools > Serial Port menu?"), iname));
+    } else if (port.openPort()) {
+        port.setComPortParameters(irate, idatabits, stopbits, parity);
+        port.setFlowControl​(flowControl);
+        port.addDataListener(this);
+    } else {
+        throw new SerialException(format(tr("Error opening serial port ''{0}''."), iname));
     }
   }
 
@@ -163,27 +171,43 @@ public class Serial implements SerialPortEventListener {
 
   public void dispose() throws IOException {
     if (port != null) {
-      try {
-        if (port.isOpened()) {
-          port.closePort();  // close the port
+      if (port.isOpen()) {
+        if (!port.closePort()) {  // close the port
+          throw new IOException(format(tr("Error opening serial port ''{0}''."), port.toString()));
         }
-      } catch (SerialPortException e) {
-        throw new IOException(e);
-      } finally {
-        port = null;
       }
+      port = null;
     }
   }
 
   @Override
+  public synchronized int getListeningEvents() {
+    return SerialPort.LISTENING_EVENT_DATA_RECEIVED;
+  }
+
+  @Override
   public synchronized void serialEvent(SerialPortEvent serialEvent) {
-    if (serialEvent.isRXCHAR()) {
-      try {
-        byte[] buf = port.readBytes(serialEvent.getEventValue());
-        processSerialEvent(buf);
-      } catch (SerialPortException e) {
-        errorMessage("serialEvent", e);
-      }
+    if (serialEvent.getEventType() == SerialPort.LISTENING_EVENT_DATA_RECEIVED) {
+      byte[] buf = serialEvent.getReceivedData();
+        int next = 0;
+        while(next < buf.length) {
+          while(next < buf.length && outToMessage.hasRemaining()) {
+            int spaceInIn = inFromSerial.remaining();
+            int copyNow = buf.length - next < spaceInIn ? buf.length - next : spaceInIn;
+            inFromSerial.put(buf, next, copyNow);
+            next += copyNow;
+            inFromSerial.flip();
+            bytesToStrings.decode(inFromSerial, outToMessage, false);
+            inFromSerial.compact();
+          }
+          outToMessage.flip();
+          if(outToMessage.hasRemaining()) {
+            char[] chars = new char[outToMessage.remaining()];
+            outToMessage.get(chars);
+            message(chars, chars.length);
+          }
+          outToMessage.clear();
+        }
     }
   }
 
@@ -241,19 +265,16 @@ public class Serial implements SerialPortEventListener {
    * This will handle both ints, bytes and chars transparently.
    */
   public void write(int what) {  // will also cover char
-    try {
-      port.writeInt(what & 0xff);
-    } catch (SerialPortException e) {
-      errorMessage("write", e);
+    byte[] bytes = new byte[]{(byte)(what & 0xff)};
+    if (port.writeBytes(bytes, 1) < 0) {
+      errorMessage("write");
     }
   }
 
 
   public void write(byte bytes[]) {
-    try {
-      port.writeBytes(bytes);
-    } catch (SerialPortException e) {
-      errorMessage("write", e);
+    if (port.writeBytes(bytes, bytes.length) < 0) {
+      errorMessage("write");
     }
   }
 
@@ -275,18 +296,26 @@ public class Serial implements SerialPortEventListener {
   }
 
   public void setDTR(boolean state) {
-    try {
-      port.setDTR(state);
-    } catch (SerialPortException e) {
-      errorMessage("setDTR", e);
+    boolean res;
+    if (state) {
+      res = port.setDTR();
+    } else {
+      res = port.clearDTR();
+    }
+    if (!res) {
+      errorMessage("setDTR");
     }
   }
 
   public void setRTS(boolean state) {
-    try {
-      port.setRTS(state);
-    } catch (SerialPortException e) {
-      errorMessage("setRTS", e);
+    boolean res;
+    if (state) {
+      res = port.setRTS();
+    } else {
+      res = port.clearRTS();
+    }
+    if (!res) {
+      errorMessage("setDTR");
     }
   }
 
@@ -302,7 +331,7 @@ public class Serial implements SerialPortEventListener {
   }
 
   static public List<String> list() {
-    return Arrays.asList(SerialPortList.getPortNames());
+    return SerialPortList.getPortNames();
   }
 
 
@@ -310,8 +339,7 @@ public class Serial implements SerialPortEventListener {
    * General error reporting, all corraled here just in case
    * I think of something slightly more intelligent to do.
    */
-  private static void errorMessage(String where, Throwable e) {
+  private static void errorMessage(String where) {
     System.err.println(format(tr("Error inside Serial.{0}()"), where));
-    e.printStackTrace();
   }
 }

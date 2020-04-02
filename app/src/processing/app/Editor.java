@@ -95,7 +95,7 @@ import cc.arduino.packages.uploaders.SerialUploader;
 import cc.arduino.view.GoToLineNumber;
 import cc.arduino.view.StubMenuListener;
 import cc.arduino.view.findreplace.FindReplace;
-import jssc.SerialPortException;
+import com.fazecast.jSerialComm.SerialPortInvalidPortException​;
 import processing.app.debug.RunnerException;
 import processing.app.debug.TargetBoard;
 import processing.app.forms.PasswordAuthorizationDialog;
@@ -2253,8 +2253,8 @@ public class Editor extends JFrame implements RunnerListener {
         statusError(tr("Unable to connect: wrong password?"));
       } catch (SerialException e) {
         String errorMessage = e.getMessage();
-        if (e.getCause() != null && e.getCause() instanceof SerialPortException) {
-          errorMessage += " (" + ((SerialPortException) e.getCause()).getExceptionType() + ")";
+        if (e.getCause() != null && e.getCause() instanceof SerialPortInvalidPortException​) {
+          errorMessage += " (" + ((SerialPortInvalidPortException​) e.getCause()).getMessage() + ")";
         }
         serialMonitor = null;
         statusError(errorMessage);
@@ -2352,8 +2352,8 @@ public class Editor extends JFrame implements RunnerListener {
         statusError(tr("Unable to connect: wrong password?"));
       } catch (SerialException e) {
         String errorMessage = e.getMessage();
-        if (e.getCause() != null && e.getCause() instanceof SerialPortException) {
-          errorMessage += " (" + ((SerialPortException) e.getCause()).getExceptionType() + ")";
+        if (e.getCause() != null && e.getCause() instanceof SerialPortInvalidPortException​) {
+          errorMessage += " (" + ((SerialPortInvalidPortException​) e.getCause()).getMessage() + ")";
         }
         statusError(errorMessage);
         serialPlotter = null;

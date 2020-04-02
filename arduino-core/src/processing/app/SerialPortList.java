@@ -30,38 +30,46 @@ import java.io.File;
 import java.util.Comparator;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
+import java.util.Arrays;
+import java.util.List;
 
-import jssc.SerialNativeInterface;
+import com.fazecast.jSerialComm.SerialPort;
+import com.fazecast.jSerialComm.SerialPortInvalidPortException​;
+
+import processing.app.helpers.OSUtils;
+
 
 /**
  *
- * @author scream3r
+ * @author rdratlos@nepomuc.de
  */
 public class SerialPortList {
+    private static SerialPort[] ports;
 
-    private static SerialNativeInterface serialInterface;
     private static final Pattern PORTNAMES_REGEXP;
     private static final String PORTNAMES_PATH;
+    
+    private static OSUtils.OSType osType;
 
     static {
-        serialInterface = new SerialNativeInterface();
-        switch (SerialNativeInterface.getOsType()) {
-            case SerialNativeInterface.OS_LINUX: {
+        ports = SerialPort.getCommPorts();
+        switch (OSUtils.getOperatingSystemType()) {
+            case OS_LINUX: {
                 PORTNAMES_REGEXP = Pattern.compile("(ttyS|ttyUSB|ttyACM|ttyAMA|rfcomm|ttyO)[0-9]{1,3}");
                 PORTNAMES_PATH = "/dev/";
                 break;
             }
-            case SerialNativeInterface.OS_SOLARIS: {
+            case OS_SOLARIS: {
                 PORTNAMES_REGEXP = Pattern.compile("[0-9]*|[a-z]*");
                 PORTNAMES_PATH = "/dev/term/";
                 break;
             }
-            case SerialNativeInterface.OS_MAC_OS_X: {
+            case OS_MAC_OS_X: {
                 PORTNAMES_REGEXP = Pattern.compile("(tty|cu)\\..*");
                 PORTNAMES_PATH = "/dev/";
                 break;
             }
-            case SerialNativeInterface.OS_WINDOWS: {
+            case OS_WINDOWS: {
                 PORTNAMES_REGEXP = Pattern.compile("");
                 PORTNAMES_PATH = "";
                 break;
@@ -178,7 +186,7 @@ public class SerialPortList {
      * @return String array. If there is no ports in the system String[]
      * with <b>zero</b> length will be returned (since jSSC-0.8 in previous versions null will be returned)
      */
-    public static String[] getPortNames() {
+    public static List<String> getPortNames() {
         return getPortNames(PORTNAMES_PATH, PORTNAMES_REGEXP, PORTNAMES_COMPARATOR);
     }
 
@@ -195,7 +203,7 @@ public class SerialPortList {
      *
      * @since 2.3.0
      */
-    public static String[] getPortNames(String searchPath) {
+    public static List<String> getPortNames(String searchPath) {
         return getPortNames(searchPath, PORTNAMES_REGEXP, PORTNAMES_COMPARATOR);
     }
 
@@ -208,7 +216,7 @@ public class SerialPortList {
      *
      * @since 2.3.0
      */
-    public static String[] getPortNames(Pattern pattern) {
+    public static List<String> getPortNames(Pattern pattern) {
         return getPortNames(PORTNAMES_PATH, pattern, PORTNAMES_COMPARATOR);
     }
 
@@ -221,7 +229,7 @@ public class SerialPortList {
      *
      * @since 2.3.0
      */
-    public static String[] getPortNames(Comparator<String> comparator) {
+    public static List<String> getPortNames(Comparator<String> comparator) {
         return getPortNames(PORTNAMES_PATH, PORTNAMES_REGEXP, comparator);
     }
 
@@ -239,7 +247,7 @@ public class SerialPortList {
      *
      * @since 2.3.0
      */
-    public static String[] getPortNames(String searchPath, Pattern pattern) {
+    public static List<String> getPortNames(String searchPath, Pattern pattern) {
         return getPortNames(searchPath, pattern, PORTNAMES_COMPARATOR);
     }
 
@@ -257,7 +265,7 @@ public class SerialPortList {
      *
      * @since 2.3.0
      */
-    public static String[] getPortNames(String searchPath, Comparator<String> comparator) {
+    public static List<String> getPortNames(String searchPath, Comparator<String> comparator) {
         return getPortNames(searchPath, PORTNAMES_REGEXP, comparator);
     }
 
@@ -271,7 +279,7 @@ public class SerialPortList {
      *
      * @since 2.3.0
      */
-    public static String[] getPortNames(Pattern pattern, Comparator<String> comparator) {
+    public static List<String> getPortNames(Pattern pattern, Comparator<String> comparator) {
         return getPortNames(PORTNAMES_PATH, pattern, comparator);
     }
 
@@ -290,14 +298,17 @@ public class SerialPortList {
      *
      * @since 2.3.0
      */
-    public static String[] getPortNames(String searchPath, Pattern pattern, Comparator<String> comparator) {
+    public static List<String> getPortNames(String searchPath, Pattern pattern, Comparator<String> comparator) {
         if(searchPath == null || pattern == null || comparator == null){
-            return new String[]{};
+            return Arrays.asList(new String[]{});
         }
-        if(SerialNativeInterface.getOsType() == SerialNativeInterface.OS_WINDOWS){
-            return getWindowsPortNames(pattern, comparator);
+        switch (OSUtils.getOperatingSystemType()) {
+            case OS_LINUX:
+            case OS_WINDOWS:
+              return Arrays.asList(getPortLabels(pattern, comparator));
+            default:
+              return Arrays.asList(searchPortLabels(searchPath, pattern, comparator));
         }
-        return getUnixBasedPortNames(searchPath, pattern, comparator);
     }
 
     /**
@@ -305,24 +316,29 @@ public class SerialPortList {
      *
      * @since 2.3.0
      */
-    private static String[] getWindowsPortNames(Pattern pattern, Comparator<String> comparator) {
-        String[] portNames = serialInterface.getSerialPortNames();
-        if(portNames == null){
+    private static String[] getPortLabels(Pattern pattern, Comparator<String> comparator) {
+        if(ports == null){
             return new String[]{};
         }
-        TreeSet<String> ports = new TreeSet<>(comparator);
+        
+        String[] portNames = new String[ports.length];
+        int i = 0;
+        for(SerialPort port : ports) {
+            portNames[i++] = port.getSystemPortName();
+        }
+        TreeSet<String> retPorts = new TreeSet<>(comparator);
         for(String portName : portNames){
             if(pattern.matcher(portName).find()){
-                ports.add(portName);
+                retPorts.add(portName);
             }
         }
-        return ports.toArray(new String[ports.size()]);
+        return retPorts.toArray(new String[retPorts.size()]);
     }
 
     /**
      * Universal method for getting port names of _nix based systems
      */
-    private static String[] getUnixBasedPortNames(String searchPath, Pattern pattern, Comparator<String> comparator) {
+    private static String[] searchPortLabels(String searchPath, Pattern pattern, Comparator<String> comparator) {
         searchPath = (searchPath.equals("") ? searchPath : (searchPath.endsWith("/") ? searchPath : searchPath + "/"));
         String[] returnArray = new String[]{};
         File dir = new File(searchPath);
@@ -333,18 +349,17 @@ public class SerialPortList {
                 for(File file : files){
                     String fileName = file.getName();
                     if(!file.isDirectory() && !file.isFile() && pattern.matcher(fileName).find()){
-                        String portName = searchPath + fileName;
-                        // For linux ttyS0..31 serial ports check existence by opening each of them
-                        if (fileName.startsWith("ttyS")) {
-	                        long portHandle = serialInterface.openPort(portName, false);//Open port without TIOCEXCL
-	                        if(portHandle < 0 && portHandle != SerialNativeInterface.ERR_PORT_BUSY){
-	                            continue;
-	                        }
-	                        else if(portHandle != SerialNativeInterface.ERR_PORT_BUSY) {
-	                            serialInterface.closePort(portHandle);
-	                        }
+                        String portName;
+                        SerialPort discoverPort;
+                        // Check for non-functional ports
+                        try {
+                          discoverPort = SerialPort.getCommPort(searchPath + fileName);
+                        } catch (SerialPortInvalidPortException​ e) {
+                          discoverPort = null;
                         }
-                        portsTree.add(portName);
+                        if (discoverPort != null) {
+                          portsTree.add(discoverPort.getSystemPortName());
+                        }
                     }
                 }
                 returnArray = portsTree.toArray(returnArray);
