@@ -42,6 +42,11 @@ import processing.app.helpers.OSUtils;
 /**
  *
  * @author rdratlos@nepomuc.de
+ * @Todo   Add more OS to getPortLabels()
+ *         Thoroughly test systems other than Windows and Linux for adequate
+ *         serial port discovery by jSerialComm library. Systems that are correctly
+ *         supported by jSerialComm should be added to the OS list in getPortNames()
+ *         to use getPortLabels() for port dioscovery.
  */
 public class SerialPortList {
     private static SerialPort[] ports;
@@ -49,8 +54,6 @@ public class SerialPortList {
     private static final Pattern PORTNAMES_REGEXP;
     private static final String PORTNAMES_PATH;
     
-    private static OSUtils.OSType osType;
-
     static {
         ports = SerialPort.getCommPorts();
         switch (OSUtils.getOperatingSystemType()) {
@@ -183,140 +186,29 @@ public class SerialPortList {
      * Solaris - "[0-9]*|[a-z]*"<br>
      * MacOSX - "tty.(serial|usbserial|usbmodem).*"<br>
      *
+     * 
      * @return String array. If there is no ports in the system String[]
      * with <b>zero</b> length will be returned (since jSSC-0.8 in previous versions null will be returned)
      */
     public static List<String> getPortNames() {
-        return getPortNames(PORTNAMES_PATH, PORTNAMES_REGEXP, PORTNAMES_COMPARATOR);
-    }
-
-    /**
-     * Get sorted array of serial ports in the system located on searchPath
-     *
-     * @param searchPath Path for searching serial ports <b>(not null)</b><br>
-     * The default search paths:<br>
-     * Linux, MacOSX: <b>/dev/</b><br>
-     * Solaris: <b>/dev/term/</b><br>
-     * Windows: <b>this parameter ingored</b>
-     *
-     * @return String array. If there is no ports in the system String[]
-     *
-     * @since 2.3.0
-     */
-    public static List<String> getPortNames(String searchPath) {
-        return getPortNames(searchPath, PORTNAMES_REGEXP, PORTNAMES_COMPARATOR);
-    }
-
-    /**
-     * Get sorted array of serial ports in the system matched pattern
-     *
-     * @param pattern RegExp pattern for matching port names <b>(not null)</b>
-     * 
-     * @return String array. If there is no ports in the system String[]
-     *
-     * @since 2.3.0
-     */
-    public static List<String> getPortNames(Pattern pattern) {
-        return getPortNames(PORTNAMES_PATH, pattern, PORTNAMES_COMPARATOR);
-    }
-
-    /**
-     * Get sorted array of serial ports in the system matched pattern
-     *
-     * @param comparator Comparator for sotring port names <b>(not null)</b>
-     *
-     * @return String array. If there is no ports in the system String[]
-     *
-     * @since 2.3.0
-     */
-    public static List<String> getPortNames(Comparator<String> comparator) {
-        return getPortNames(PORTNAMES_PATH, PORTNAMES_REGEXP, comparator);
-    }
-
-    /**
-     * Get sorted array of serial ports in the system located on searchPath, matched pattern
-     *
-     * @param searchPath Path for searching serial ports <b>(not null)</b><br>
-     * The default search paths:<br>
-     * Linux, MacOSX: <b>/dev/</b><br>
-     * Solaris: <b>/dev/term/</b><br>
-     * Windows: <b>this parameter ingored</b>
-     * @param pattern RegExp pattern for matching port names <b>(not null)</b>
-     *
-     * @return String array. If there is no ports in the system String[]
-     *
-     * @since 2.3.0
-     */
-    public static List<String> getPortNames(String searchPath, Pattern pattern) {
-        return getPortNames(searchPath, pattern, PORTNAMES_COMPARATOR);
-    }
-
-    /**
-     * Get sorted array of serial ports in the system located on searchPath and sorted by comparator
-     *
-     * @param searchPath Path for searching serial ports <b>(not null)</b><br>
-     * The default search paths:<br>
-     * Linux, MacOSX: <b>/dev/</b><br>
-     * Solaris: <b>/dev/term/</b><br>
-     * Windows: <b>this parameter ingored</b>
-     * @param comparator Comparator for sotring port names <b>(not null)</b>
-     *
-     * @return String array. If there is no ports in the system String[]
-     *
-     * @since 2.3.0
-     */
-    public static List<String> getPortNames(String searchPath, Comparator<String> comparator) {
-        return getPortNames(searchPath, PORTNAMES_REGEXP, comparator);
-    }
-
-    /**
-     * Get sorted array of serial ports in the system matched pattern and sorted by comparator
-     *
-     * @param pattern RegExp pattern for matching port names <b>(not null)</b>
-     * @param comparator Comparator for sotring port names <b>(not null)</b>
-     *
-     * @return String array. If there is no ports in the system String[]
-     *
-     * @since 2.3.0
-     */
-    public static List<String> getPortNames(Pattern pattern, Comparator<String> comparator) {
-        return getPortNames(PORTNAMES_PATH, pattern, comparator);
-    }
-
-    /**
-     * Get sorted array of serial ports in the system located on searchPath, matched pattern and sorted by comparator
-     *
-     * @param searchPath Path for searching serial ports <b>(not null)</b><br>
-     * The default search paths:<br>
-     * Linux, MacOSX: <b>/dev/</b><br>
-     * Solaris: <b>/dev/term/</b><br>
-     * Windows: <b>this parameter ingored</b>
-     * @param pattern RegExp pattern for matching port names <b>(not null)</b>
-     * @param comparator Comparator for sotring port names <b>(not null)</b>
-     *
-     * @return String array. If there is no ports in the system String[]
-     *
-     * @since 2.3.0
-     */
-    public static List<String> getPortNames(String searchPath, Pattern pattern, Comparator<String> comparator) {
-        if(searchPath == null || pattern == null || comparator == null){
-            return Arrays.asList(new String[]{});
-        }
         switch (OSUtils.getOperatingSystemType()) {
             case OS_LINUX:
             case OS_WINDOWS:
-              return Arrays.asList(getPortLabels(pattern, comparator));
+              return Arrays.asList(getPortLabels(PORTNAMES_COMPARATOR));
             default:
-              return Arrays.asList(searchPortLabels(searchPath, pattern, comparator));
+              return Arrays.asList(searchPortLabels(PORTNAMES_PATH, PORTNAMES_REGEXP, PORTNAMES_COMPARATOR));
         }
     }
 
     /**
      * Get serial port names in Windows
      *
+     * @param comparator Comparator for sotring port names <b>(not null)</b>
+     * @return String array. If there is no ports in the system String[]
+     * 
      * @since 2.3.0
      */
-    private static String[] getPortLabels(Pattern pattern, Comparator<String> comparator) {
+    private static String[] getPortLabels(Comparator<String> comparator) {
         if(ports == null){
             return new String[]{};
         }
@@ -328,15 +220,23 @@ public class SerialPortList {
         }
         TreeSet<String> retPorts = new TreeSet<>(comparator);
         for(String portName : portNames){
-            if(pattern.matcher(portName).find()){
-                retPorts.add(portName);
-            }
+          retPorts.add(portName);
         }
         return retPorts.toArray(new String[retPorts.size()]);
     }
 
     /**
      * Universal method for getting port names of _nix based systems
+     * 
+     * @param searchPath Path for searching serial ports <b>(not null)</b><br>
+     * The default search paths:<br>
+     * Linux, MacOSX: <b>/dev/</b><br>
+     * Solaris: <b>/dev/term/</b><br>
+     * Windows: <b>this parameter ingored</b>
+     * @param pattern RegExp pattern for matching port names <b>(not null)</b>
+     * @param comparator Comparator for sotring port names <b>(not null)</b>
+     *
+     * @return String array. If there is no ports in the system String[]
      */
     private static String[] searchPortLabels(String searchPath, Pattern pattern, Comparator<String> comparator) {
         searchPath = (searchPath.equals("") ? searchPath : (searchPath.endsWith("/") ? searchPath : searchPath + "/"));
@@ -349,7 +249,6 @@ public class SerialPortList {
                 for(File file : files){
                     String fileName = file.getName();
                     if(!file.isDirectory() && !file.isFile() && pattern.matcher(fileName).find()){
-                        String portName;
                         SerialPort discoverPort;
                         // Check for non-functional ports
                         try {
